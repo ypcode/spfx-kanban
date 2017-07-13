@@ -1,0 +1,10 @@
+{
+  "solution": {
+    "name": "kanban-webpart-demo-client-side-solution",
+    "id": "46d16293-e6d5-4fd4-9e24-814fa512b1d1",
+    "version": "1.0.0.0"
+  },
+  "paths": {
+    "zippedPackage": "solution/kanban-webpart-demo.sppkg"
+  }
+}

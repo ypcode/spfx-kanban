@@ -1,0 +1,15 @@
+{
+  "entries": [
+    {
+      "entry": "./lib/webparts/kanbanBoard/KanbanBoardWebPart.js",
+      "manifest": "./src/webparts/kanbanBoard/KanbanBoardWebPart.manifest.json",
+      "outputPath": "./dist/kanban-board.bundle.js"
+    }
+  ],
+  "externals": {
+ 
+  },
+  "localizedResources": {
+    "kanbanBoardStrings": "webparts/kanbanBoard/loc/{locale}.js"
+  }
+}
