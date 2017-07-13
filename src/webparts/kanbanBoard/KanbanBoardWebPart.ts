@@ -118,7 +118,7 @@ export default class KanbanBoardWebPart extends BaseClientSideWebPart<IKanbanBoa
 
     // For each status
     this.statuses.forEach(status => {
-      // Append a new Office UI Fabric column with the appropriate with to the row
+      // Append a new Office UI Fabric column with the appropriate width to the row
       html += `<div class="${styles.kanbanColumn} ms-Grid-col ${columnSizeClass}" data-status="${status}">
                   <h3 class="ms-fontColor-themePrimary">${status}</h3>`;
       // Get all the tasks in the current status
