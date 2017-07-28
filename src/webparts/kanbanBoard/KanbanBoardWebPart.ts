@@ -2,35 +2,39 @@ import { Version } from '@microsoft/sp-core-library';
 import {
   BaseClientSideWebPart,
   IPropertyPaneConfiguration,
-  PropertyPaneTextField,
-  PropertyPaneDropdown
+  PropertyPaneDropdown,
 } from '@microsoft/sp-webpart-base';
-import { escape } from '@microsoft/sp-lodash-subset';
-
 import { SPComponentLoader } from '@microsoft/sp-loader';
-
 import styles from './KanbanBoard.module.scss';
 import * as strings from 'kanbanBoardStrings';
 import { IKanbanBoardWebPartProps } from './IKanbanBoardWebPartProps';
+import { AppStartup } from "../../startup";
 
-import pnp from "sp-pnp-js";
-
+// jQuery and jQuery UI Drag&Drop extensions
 import * as $ from "jquery";
 require("jquery-ui/ui/widgets/draggable");
 require("jquery-ui/ui/widgets/droppable");
 
-import { ITask } from "./models/ITask";
-import { IListInfo } from "./models/IListInfo";
-import { IFieldInfo } from "./models/IFieldInfo";
+// Models
+import { ITask, IListInfo, IFieldInfo } from "../../models/";
 
-export const LAYOUT_MAX_COLUMNS = 12;
+// Services
+import {
+  IConfigurationService, ConfigurationServiceKey,
+  IDataService, DataServiceKey
+} from "../../services";
+
+// Constants
+const LAYOUT_MAX_COLUMNS = 12;
 
 export default class KanbanBoardWebPart extends BaseClientSideWebPart<IKanbanBoardWebPartProps> {
 
   private statuses: string[] = [];
   private tasks: ITask[] = [];
   private availableLists: IListInfo[] = [];
-
+  private availableChoiceFields: IFieldInfo[] = [];
+  private dataService: IDataService = null;
+  private config: IConfigurationService = null;
 
   constructor() {
     super();
@@ -38,43 +42,32 @@ export default class KanbanBoardWebPart extends BaseClientSideWebPart<IKanbanBoa
   }
 
   public onInit(): Promise<any> {
-    return super.onInit().then(_ => {
-      // Configure PnP Js for working seamlessly with SPFx
-      pnp.setup({
-        spfxContext: this.context
-      });
-    })
+    return super.onInit()
+      // Set the global configuration of the application
+      // This is where we will define the proper services according to the context (Local, Test, Prod,...) 
+      // or according to specific settings
+      .then(_ => AppStartup.configure(this.context, this.properties))
+      // When configuration is done, we get the instances of the services we want to use
+      .then(serviceScope => {
+        this.dataService = serviceScope.consume(DataServiceKey);
+        this.config = serviceScope.consume(ConfigurationServiceKey);
+      })
+      // Then, we are able to use the methods of the services
       // Load the available lists in the current site
-      .then(() => this._loadAvailableLists())
+      .then(() => this.dataService.getAvailableLists())
       .then((lists: IListInfo[]) => this.availableLists = lists);
   }
 
-  private _loadAvailableLists(): Promise<IListInfo[]> {
-    return pnp.sp.web.lists.expand("Fields").select("Id", "Title", "Fields/Title", "Fields/InternalName", "Fields/TypeAsString").get();
-  }
 
-  private _loadTasks(): Promise<ITask[]> {
-    return pnp.sp.web.lists.getById(this.properties.tasksListId).items.select("Id", "Title", this.properties.statusFieldName).get()
-      .then((results: ITask[]) => results && results.map(t => ({
-        Id: t.Id,
-        Title: t.Title,
-        Status: t[this.properties.statusFieldName]
-      })));
-  }
-
-  private _loadStatuses(): Promise<string[]> {
-    console.log("Load statuses...");
-    return pnp.sp.web.lists.getById(this.properties.tasksListId).fields.getByInternalNameOrTitle(this.properties.statusFieldName).get()
-      .then((fieldInfo: IFieldInfo) => fieldInfo.Choices || []);
-  }
 
   public render(): void {
+
     // Only if properly configured
     if (this.properties.statusFieldName && this.properties.tasksListId) {
       // Load the data
-      this._loadStatuses()
+      this.dataService.getStatuses()
         .then((statuses: string[]) => this.statuses = statuses)
-        .then(() => this._loadTasks())
+        .then(() => this.dataService.getAllTasks())
         .then((tasks: ITask[]) => this.tasks = tasks)
         // And then render
         .then(() => this._renderBoard())
@@ -83,7 +76,7 @@ export default class KanbanBoardWebPart extends BaseClientSideWebPart<IKanbanBoa
           console.log("An error occured while loading data...");
         });
     } else {
-      this.domElement.innerHTML = "<div>Please configure the WebPart</div>";
+      this.domElement.innerHTML = `<div class="ms-MessageBar ms-MessageBar--warning">${strings.PleaseConfigureWebPartMessage}</div>`
     }
   }
 
@@ -100,7 +93,6 @@ export default class KanbanBoardWebPart extends BaseClientSideWebPart<IKanbanBoa
 
     let columnSize = Math.floor(LAYOUT_MAX_COLUMNS / columnsCount);
 
-    console.log("Column size =" + columnSize);
     return "ms-u-sm" + (columnSize || 1);
   }
 
@@ -141,10 +133,12 @@ export default class KanbanBoardWebPart extends BaseClientSideWebPart<IKanbanBoa
     // Apply the generated HTML to the WebPart DOM element
     this.domElement.innerHTML = html;
 
+    $(this.domElement).find(".linkAddTask").click(() => alert('Add'));
+
     console.log("Kanban columns found : " + $(".kanban-column").length);
     // Make the kanbanColumn elements droppable areas
     let webpart = this;
-    $(`.${styles.kanbanColumn}`).droppable({
+    $(this.domElement).find(`.${styles.kanbanColumn}`).droppable({
       tolerance: "intersect",
       accept: `.${styles.task}`,
       activeClass: "ui-state-default",
@@ -161,14 +155,13 @@ export default class KanbanBoardWebPart extends BaseClientSideWebPart<IKanbanBoa
 
         // If the status has changed, apply the changes
         if (previousStatus != newStatus) {
-          webpart.changeTaskStatus(taskId, newStatus);
+          webpart.dataService.updateTaskStatus(taskId, newStatus);
         }
       }
     });
 
-    console.log("Task items found : " + $(".task").length);
     // Make the task items draggable
-    $(`.${styles.task}`).draggable({
+    $(this.domElement).find(`.${styles.task}`).draggable({
       classes: {
         "ui-draggable-dragging": styles.dragging
       },
@@ -179,28 +172,13 @@ export default class KanbanBoardWebPart extends BaseClientSideWebPart<IKanbanBoa
     });
   }
 
-  private changeTaskStatus(taskId: number, newStatus: string) {
-    // Set the value for the configured "status" field
-    let fieldsToUpdate = {};
-    fieldsToUpdate[this.properties.statusFieldName] = newStatus;
-
-    // Update the property on the list item
-    pnp.sp.web.lists.getById(this.properties.tasksListId).items.getById(taskId).update(fieldsToUpdate);
-  }
-
   protected get dataVersion(): Version {
     return Version.parse('1.0');
   }
 
-  private _getAvailableFieldsFromCurrentList(): IFieldInfo[] {
-    if (!this.properties.tasksListId)
-      return [];
-
-    let filteredListInfo = this.availableLists.filter(l => l.Id == this.properties.tasksListId);
-    if (filteredListInfo.length != 1)
-      return [];
-
-    return filteredListInfo[0].Fields.filter(f => f.TypeAsString == "Choice");
+  public onPropertyPaneFieldChanged(propertyName: string, oldValue: string, newValue: string) {
+    this.config.statusFieldInternalName = this.properties.statusFieldName;
+    this.config.tasksListId = this.properties.tasksListId;
   }
 
   protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {
@@ -208,22 +186,22 @@ export default class KanbanBoardWebPart extends BaseClientSideWebPart<IKanbanBoa
       pages: [
         {
           header: {
-            description: "Settings"
+            description: strings.HeaderDescription
           },
           groups: [
             {
-              groupName: "Tasks source configuration",
+              groupName: strings.TasksConfigurationGroup,
               groupFields: [
                 PropertyPaneDropdown('tasksListId', {
-                  label: "Source Task list",
+                  label: strings.SourceTasksList,
                   options: this.availableLists.map(l => ({
                     key: l.Id,
                     text: l.Title
                   }))
                 }),
                 PropertyPaneDropdown('statusFieldName', {
-                  label: "Status field Internal name",
-                  options: this._getAvailableFieldsFromCurrentList().map(f => ({
+                  label: strings.StatusFieldInternalName,
+                  options: this.dataService.getAvailableChoiceFieldsFromLoadedLists().map(f => ({
                     key: f.InternalName,
                     text: f.Title
                   }))

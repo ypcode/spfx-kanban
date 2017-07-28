@@ -1,5 +1,9 @@
 declare interface IKanbanBoardStrings {
-  TaskListConfigurationGroup: string;
+  HeaderDescription: string;
+  TasksConfigurationGroup: string;
+  SourceTasksList: string;
+  StatusFieldInternalName: string;
+  PleaseConfigureWebPartMessage: string;
 }
 
 declare module 'kanbanBoardStrings' {

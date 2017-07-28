@@ -1,7 +1,9 @@
 define([], function() {
   return {
-    "PropertyPaneDescription": "Description",
-    "BasicGroupName": "Group Name",
-    "DescriptionFieldLabel": "Description Field"
+    "HeaderDescription": "Settings",
+    "TasksConfigurationGroup": "Tasks configuration",
+    "SourceTasksList": "Source Task list",
+    "StatusFieldInternalName": "Status field Internal name",
+    "PleaseConfigureWebPartMessage": "Please configure the WebPart"
   }
 });
