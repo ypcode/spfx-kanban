@@ -70,13 +70,16 @@ export default class KanbanBoardWebPart extends BaseClientSideWebPart<IKanbanBoa
         .then(() => this.dataService.getAllTasks())
         .then((tasks: ITask[]) => this.tasks = tasks)
         // And then render
-        .then(() => this._renderBoard())
+        .then(() => {
+          this.domElement.innerHTML = this.renderBoard();
+          this.enableDragAndDrop();
+        })
         .catch(error => {
           console.log(error);
           console.log("An error occured while loading data...");
         });
     } else {
-      this.domElement.innerHTML = `<div class="ms-MessageBar ms-MessageBar--warning">${strings.PleaseConfigureWebPartMessage}</div>`
+      this.domElement.innerHTML = `<div class="ms-MessageBar ms-MessageBar--warning">${strings.PleaseConfigureWebPartMessage}</div>`;
     }
   }
 
@@ -99,7 +102,7 @@ export default class KanbanBoardWebPart extends BaseClientSideWebPart<IKanbanBoa
   /**
    * Generates and inject the HTML of the Kanban Board
    */
-  private _renderBoard(): void {
+  public renderBoard(): string {
     let columnSizeClass = this._getColumnSizeClassName(this.statuses.length);
 
     // The begininning of the WebPart
@@ -112,30 +115,25 @@ export default class KanbanBoardWebPart extends BaseClientSideWebPart<IKanbanBoa
     this.statuses.forEach(status => {
       // Append a new Office UI Fabric column with the appropriate width to the row
       html += `<div class="${styles.kanbanColumn} ms-Grid-col ${columnSizeClass}" data-status="${status}">
-                  <h3 class="ms-fontColor-themePrimary">${status}</h3>`;
+                <h3 class="ms-fontColor-themePrimary">${status}</h3>`;
       // Get all the tasks in the current status
       let currentGroupTasks = this.tasks.filter(t => t.Status == status);
       // Add a new tile for each task in the current column
       currentGroupTasks.forEach(task => {
         html += `<div class="${styles.task}" data-taskid="${task.Id}">
-                        <div class="ms-fontSize-xl">${task.Title}</div>
-                      </div>`;
+          <div class="ms-fontSize-xl">${task.Title}</div></div>`;
       });
       // Close the column element
       html += `</div>`;
     });
 
     // Ends the WebPart HTML
-    html += `</div>
-        </div>
-      </div>`;
+    html += `</div></div></div>`;
 
-    // Apply the generated HTML to the WebPart DOM element
-    this.domElement.innerHTML = html;
+    return html;
+  }
 
-    $(this.domElement).find(".linkAddTask").click(() => alert('Add'));
-
-    console.log("Kanban columns found : " + $(".kanban-column").length);
+  private enableDragAndDrop() {
     // Make the kanbanColumn elements droppable areas
     let webpart = this;
     $(this.domElement).find(`.${styles.kanbanColumn}`).droppable({

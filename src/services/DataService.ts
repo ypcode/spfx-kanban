@@ -73,6 +73,9 @@ export default class SharePointDataService implements IDataService {
                 this.cachedAvailableLists = lists;
                 return lists;
             });
+
+
+           
     }
 
     public getAvailableChoiceFields(): Promise<IFieldInfo[]> {
