@@ -171,7 +171,7 @@ export default class KanbanBoardWebPart extends BaseClientSideWebPart<IKanbanBoa
   }
 
   protected get dataVersion(): Version {
-    return Version.parse('1.0');
+    return Version.parse('2.0');
   }
 
   public onPropertyPaneFieldChanged(propertyName: string, oldValue: string, newValue: string) {
